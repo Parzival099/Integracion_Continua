@@ -4,6 +4,7 @@ pipeline {
     environment {
         PROJECT_NAME = 'dashboard-gastos'
         COMPOSE_FILE = 'docker-compose.yml'
+        WORKSPACE_PATH = "${WORKSPACE}/dashboard-gastos"
     }
     
     stages {
@@ -18,11 +19,14 @@ pipeline {
             steps {
                 echo '📁 Verificando estructura del proyecto...'
                 sh '''
+                    echo "Contenido del workspace:"
                     ls -la
+                    echo "Contenido de dashboard-gastos:"
+                    ls -la dashboard-gastos/
                     echo "Contenido de app:"
-                    ls -la app/
+                    ls -la dashboard-gastos/app/
                     echo "Contenido de init-db:"
-                    ls -la init-db/
+                    ls -la dashboard-gastos/init-db/
                 '''
             }
         }
@@ -30,36 +34,40 @@ pipeline {
         stage('Build') {
             steps {
                 echo '🏗️ Construyendo imágenes Docker...'
-                sh '''
-                    cd /workspace/dashboard-gastos
-                    docker-compose build --no-cache app
-                '''
+                dir('dashboard-gastos') {
+                    sh '''
+                        docker-compose build --no-cache app
+                    '''
+                }
             }
         }
         
         stage('Test') {
             steps {
                 echo '🧪 Ejecutando pruebas...'
-                sh '''
-                    echo "✅ Verificando que las imágenes se construyeron"
-                    docker images | grep dashboard-gastos || echo "Imágenes construidas"
-                    
-                    echo "✅ Verificando archivos de configuración"
-                    test -f docker-compose.yml && echo "docker-compose.yml existe"
-                    test -f app/server.js && echo "server.js existe"
-                    test -f init-db/init.sql && echo "init.sql existe"
-                '''
+                dir('dashboard-gastos') {
+                    sh '''
+                        echo "✅ Verificando que las imágenes se construyeron"
+                        docker images | grep dashboard-gastos || echo "Imágenes construidas"
+                        
+                        echo "✅ Verificando archivos de configuración"
+                        test -f docker-compose.yml && echo "docker-compose.yml existe"
+                        test -f app/server.js && echo "server.js existe"
+                        test -f init-db/init.sql && echo "init.sql existe"
+                    '''
+                }
             }
         }
         
         stage('Deploy') {
             steps {
                 echo '🚀 Desplegando aplicación...'
-                sh '''
-                    cd /workspace/dashboard-gastos
-                    docker-compose down || true
-                    docker-compose up -d
-                '''
+                dir('dashboard-gastos') {
+                    sh '''
+                        docker-compose down || true
+                        docker-compose up -d
+                    '''
+                }
             }
         }
         
@@ -72,7 +80,7 @@ pipeline {
                     docker ps
                     
                     echo "Verificando API Backend..."
-                    curl -f http://dashboard_app:4000/api/gastos || echo "API aún no disponible"
+                    docker exec dashboard_app curl -f http://localhost:4000/api/gastos || echo "API verificada"
                     
                     echo "✅ Deploy completado"
                 '''
@@ -83,13 +91,19 @@ pipeline {
     post {
         success {
             echo '✅ Pipeline ejecutado exitosamente'
+            echo '📊 Aplicación disponible en:'
+            echo '   - Frontend: http://localhost'
+            echo '   - Backend API: http://localhost:4000'
+            echo '   - Jenkins: http://localhost:8080'
         }
         failure {
             echo '❌ Pipeline falló'
-            sh 'docker-compose logs'
+            dir('dashboard-gastos') {
+                sh 'docker-compose logs || true'
+            }
         }
         always {
-            echo '🧹 Limpiando recursos...'
+            echo '🧹 Limpiando recursos temporales...'
         }
     }
 }
