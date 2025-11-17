@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  # CONTENEDOR 1: Base de Datos PostgreSQL
+  db:
+    image: postgres:15-alpine
+    container_name: dashboard_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: dashboard_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    networks:
+      - dashboard-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d dashboard_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # CONTENEDOR 2: Aplicación Web (Frontend + Backend)
+  app:
+    build: ./app
+    container_name: dashboard_app
+    ports:
+      - "80:80"
+      - "4000:4000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - dashboard-network
+    environment:
+      - DB_HOST=db
+      - DB_USER=admin
+      - DB_PASSWORD=admin123
+      - DB_NAME=dashboard_db
+
+networks:
+  dashboard-network:
+    driver: bridge
+
+volumes:
+  db_data:

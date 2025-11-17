@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Gastos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #667eea;
+            color: white;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💰 Dashboard de Gastos - Docker CI/CD</h1>
+        
+        <div id="status" style="display:none;"></div>
+
+        <div class="card">
+            <h2>Estado de Conexión</h2>
+            <p id="connectionStatus">Verificando conexión con contenedores...</p>
+        </div>
+
+        <div class="card">
+            <h2>📝 Registrar Gasto</h2>
+            <form id="gastoForm">
+                <div class="form-group">
+                    <label>Concepto:</label>
+                    <input type="text" id="concepto" required>
+                </div>
+                <div class="form-group">
+                    <label>Monto:</label>
+                    <input type="number" id="monto" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoría:</label>
+                    <select id="categoria" required>
+                        <option value="Alimentación">Alimentación</option>
+                        <option value="Transporte">Transporte</option>
+                        <option value="Servicios">Servicios</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Fecha:</label>
+                    <input type="date" id="fecha" required>
+                </div>
+                <button type="submit">Agregar Gasto</button>
+            </form>
+        </div>
+
+        <div class="card">
+            <h2>📊 Historial de Gastos</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Concepto</th>
+                        <th>Categoría</th>
+                        <th>Monto</th>
+                    </tr>
+                </thead>
+                <tbody id="gastosTable">
+                    <tr><td colspan="4" style="text-align:center;">Cargando...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:4000/api';
+
+        document.getElementById('fecha').valueAsDate = new Date();
+
+        // Verificar conexión
+        verificarConexion();
+
+        document.getElementById('gastoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const gasto = {
+                concepto: document.getElementById('concepto').value,
+                monto: parseFloat(document.getElementById('monto').value),
+                categoria: document.getElementById('categoria').value,
+                fecha: document.getElementById('fecha').value
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/gastos`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(gasto)
+                });
+
+                if (response.ok) {
+                    mostrarMensaje('✅ Gasto agregado exitosamente', 'success');
+                    document.getElementById('gastoForm').reset();
+                    document.getElementById('fecha').valueAsDate = new Date();
+                    cargarGastos();
+                }
+            } catch (error) {
+                mostrarMensaje('❌ Error al agregar gasto', 'error');
+            }
+        });
+
+        async function verificarConexion() {
+            try {
+                const response = await fetch(`${API_URL}/gastos`);
+                if (response.ok) {
+                    document.getElementById('connectionStatus').innerHTML = 
+                        '✅ <strong>Contenedores comunicados correctamente</strong><br>' +
+                        '• Contenedor 1 (App): Funcionando<br>' +
+                        '• Contenedor 2 (DB): Conectado';
+                    document.getElementById('connectionStatus').style.color = 'green';
+                    cargarGastos();
+                }
+            } catch (error) {
+                document.getElementById('connectionStatus').innerHTML = 
+                    '❌ Error de conexión entre contenedores';
+                document.getElementById('connectionStatus').style.color = 'red';
+            }
+        }
+
+        async function cargarGastos() {
+            try {
+                const response = await fetch(`${API_URL}/gastos`);
+                const gastos = await response.json();
+
+                const tbody = document.getElementById('gastosTable');
+                
+                if (gastos.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No hay gastos registrados</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = gastos.map(g => `
+                    <tr>
+                        <td>${new Date(g.fecha).toLocaleDateString()}</td>
+                        <td>${g.concepto}</td>
+                        <td>${g.categoria}</td>
+                        <td>$${parseFloat(g.monto).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function mostrarMensaje(mensaje, tipo) {
+            const status = document.getElementById('status');
+            status.textContent = mensaje;
+            status.className = `status ${tipo}`;
+            status.style.display = 'block';
+            setTimeout(() => status.style.display = 'none', 3000);
+        }
+    </script>
+</body>
+</html>
