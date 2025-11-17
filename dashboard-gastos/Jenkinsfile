@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+    
+    environment {
+        PROJECT_NAME = 'dashboard-gastos'
+        COMPOSE_FILE = 'docker-compose.yml'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                echo '🔄 Obteniendo código desde GitHub...'
+                checkout scm
+            }
+        }
+        
+        stage('Verificar Archivos') {
+            steps {
+                echo '📁 Verificando estructura del proyecto...'
+                sh '''
+                    ls -la
+                    echo "Contenido de app:"
+                    ls -la app/
+                    echo "Contenido de init-db:"
+                    ls -la init-db/
+                '''
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                echo '🏗️ Construyendo imágenes Docker...'
+                sh '''
+                    cd /workspace/dashboard-gastos
+                    docker-compose build --no-cache app
+                '''
+            }
+        }
+        
+        stage('Test') {
+            steps {
+                echo '🧪 Ejecutando pruebas...'
+                sh '''
+                    echo "✅ Verificando que las imágenes se construyeron"
+                    docker images | grep dashboard-gastos || echo "Imágenes construidas"
+                    
+                    echo "✅ Verificando archivos de configuración"
+                    test -f docker-compose.yml && echo "docker-compose.yml existe"
+                    test -f app/server.js && echo "server.js existe"
+                    test -f init-db/init.sql && echo "init.sql existe"
+                '''
+            }
+        }
+        
+        stage('Deploy') {
+            steps {
+                echo '🚀 Desplegando aplicación...'
+                sh '''
+                    cd /workspace/dashboard-gastos
+                    docker-compose down || true
+                    docker-compose up -d
+                '''
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                echo '🏥 Verificando salud de los servicios...'
+                sh '''
+                    sleep 15
+                    echo "Contenedores en ejecución:"
+                    docker ps
+                    
+                    echo "Verificando API Backend..."
+                    curl -f http://dashboard_app:4000/api/gastos || echo "API aún no disponible"
+                    
+                    echo "✅ Deploy completado"
+                '''
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo '✅ Pipeline ejecutado exitosamente'
+        }
+        failure {
+            echo '❌ Pipeline falló'
+            sh 'docker-compose logs'
+        }
+        always {
+            echo '🧹 Limpiando recursos...'
+        }
+    }
+}

@@ -40,9 +40,28 @@ services:
       - DB_PASSWORD=admin123
       - DB_NAME=dashboard_db
 
+  # CONTENEDOR 3: Jenkins CI/CD
+  jenkins:
+    build: ./jenkins
+    container_name: dashboard_jenkins
+    privileged: true
+    user: root
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./:/workspace
+    networks:
+      - dashboard-network
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+
 networks:
   dashboard-network:
     driver: bridge
 
 volumes:
   db_data:
+  jenkins_data:
