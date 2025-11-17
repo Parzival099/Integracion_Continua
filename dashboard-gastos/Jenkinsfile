@@ -64,8 +64,12 @@ pipeline {
                 echo '🚀 Desplegando aplicación...'
                 dir('dashboard-gastos') {
                     sh '''
-                        docker-compose down || true
-                        docker-compose up -d
+                        # Detener solo app y db, NO jenkins
+                        docker stop dashboard_app dashboard_db || true
+                        docker rm dashboard_app dashboard_db || true
+                        
+                        # Levantar solo app y db
+                        docker-compose up -d app db
                     '''
                 }
             }
