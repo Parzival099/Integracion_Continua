@@ -1,0 +1,96 @@
+language: node_js
+node_js:
+  - "18"
+
+services:
+  - docker
+
+env:
+  global:
+    - DOCKER_COMPOSE_VERSION=2.20.0
+
+before_install:
+  - sudo rm /usr/local/bin/docker-compose
+  - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin
+  - echo "🔍 Verificando versiones..."
+  - docker --version
+  - docker-compose --version
+  - node --version
+  - npm --version
+
+install:
+  - echo "📦 Instalando dependencias..."
+  - echo "📁 Verificando estructura del proyecto..."
+  - ls -la
+  - ls -la app/
+  - ls -la init-db/
+
+script:
+  - echo "🏗️ Construyendo imágenes Docker..."
+  - docker-compose build app
+  
+  - echo "🧪 Verificando que las imágenes se construyeron correctamente..."
+  - docker images
+  - docker images | grep dashboard-gastos
+  
+  - echo "✅ Verificando archivos de configuración..."
+  - test -f docker-compose.yml && echo "✓ docker-compose.yml existe"
+  - test -f app/Dockerfile && echo "✓ Dockerfile existe"
+  - test -f app/server.js && echo "✓ server.js existe"
+  - test -f app/index.html && echo "✓ index.html existe"
+  - test -f init-db/init.sql && echo "✓ init.sql existe"
+  - test -f Jenkinsfile && echo "✓ Jenkinsfile existe"
+  
+  - echo "🚀 Levantando servicios..."
+  - docker-compose up -d db app
+  
+  - echo "⏳ Esperando que los servicios estén listos..."
+  - sleep 30
+  
+  - echo "🏥 Verificando estado de los servicios..."
+  - docker ps
+  
+  - echo "📋 Verificando logs de la aplicación..."
+  - docker logs dashboard_app
+  
+  - echo "📋 Verificando logs de la base de datos..."
+  - docker logs dashboard_db
+  
+  - echo "✅ Todas las pruebas pasaron exitosamente"
+
+after_script:
+  - echo "🧹 Limpiando contenedores..."
+  - docker-compose down
+  - docker system prune -f
+
+after_success:
+  - echo "✅ Build completado exitosamente"
+  - echo "📊 Estadísticas del build:"
+  - docker images | grep dashboard-gastos
+
+after_failure:
+  - echo "❌ Build falló"
+  - echo "📋 Logs de debug:"
+  - docker-compose logs
+  - docker ps -a
+
+notifications:
+  email:
+    recipients:
+      - brayanalvarez6802@gmail.com
+    on_success: change
+    on_failure: always
+
+branches:
+  only:
+    - main
+    - master
+    - develop
+
+cache:
+  directories:
+    - app/node_modules
+    - $HOME/.cache/pip
+    - $HOME/.npm
