@@ -36,7 +36,7 @@ pipeline {
                 echo '🏗️ Construyendo imágenes Docker...'
                 dir('dashboard-gastos') {
                     sh '''
-                        docker-compose build --no-cache app
+                        docker compose build --no-cache app
                     '''
                 }
             }
@@ -69,7 +69,7 @@ pipeline {
                         docker rm dashboard_app dashboard_db || true
                         
                         # Levantar solo app y db
-                        docker-compose up -d app db
+                        docker compose up -d app db
                     '''
                 }
             }
@@ -103,7 +103,7 @@ pipeline {
         failure {
             echo '❌ Pipeline falló'
             dir('dashboard-gastos') {
-                sh 'docker-compose logs || true'
+                sh 'docker compose logs || true'
             }
         }
         always {
